@@ -1,6 +1,7 @@
 import mongoose, { Schema, type HydratedDocument, type Model } from "mongoose";
 
 export interface IEvent {
+  _id: string;
   title: string;
   slug: string;
   description: string;
