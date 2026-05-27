@@ -34,18 +34,18 @@ const EventCard = ({ title, image, slug, location, date, time }: Props) => {
         />
       </div>
       <div className="flex flex-row gap-2">
-        <img src="/icons/pin.svg" alt="location" className="h-3.5 w-3.5" />
+        <Image src="/icons/pin.svg" alt="location" width={14} height={14} className="h-3.5 w-3.5" />
         <p>{location}</p>
       </div>
       <p className="title">{title}</p>
 
       <div className="datetime">
         <div>
-          <img src="/icons/calendar.svg" alt="date" className="h-3.5 w-3.5" />
+          <Image src="/icons/calendar.svg" alt="date" width={14} height={14} className="h-3.5 w-3.5" />
           <p>{date}</p>
         </div>
         <div>
-          <img src="/icons/clock.svg" alt="time" className="h-3.5 w-3.5" />
+          <Image src="/icons/clock.svg" alt="time" width={14} height={14} className="h-3.5 w-3.5" />
           <p>{time}</p>
         </div>
       </div>
@@ -53,4 +53,4 @@ const EventCard = ({ title, image, slug, location, date, time }: Props) => {
   );
 };
 
-export default EventCard
+export default EventCard;

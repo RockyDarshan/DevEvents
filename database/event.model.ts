@@ -16,8 +16,8 @@ export interface IEvent {
   agenda: string[];
   organizer: string;
   tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // changed from Date
+  updatedAt: string; // changed from Date
 }
 
 export type EventDocument = HydratedDocument<IEvent>;
@@ -31,11 +31,9 @@ const slugify = (value: string): string =>
 
 const normalizeDate = (value: string): string => {
   const parsedDate = new Date(value);
-
   if (Number.isNaN(parsedDate.getTime())) {
     throw new Error("Event date must be a valid date string.");
   }
-
   return parsedDate.toISOString().slice(0, 10);
 };
 
@@ -47,20 +45,17 @@ const normalizeTime = (value: string): string => {
     const hours = Number(simple24Hour[1]);
     const minutes = Number(simple24Hour[2]);
     const seconds = Number(simple24Hour[3] ?? 0);
-
     if (hours > 23 || minutes > 59 || seconds > 59) {
       throw new Error(
         "Event time must be in a valid HH:mm or HH:mm:ss format.",
       );
     }
-
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
 
   const twelveHour = trimmed.match(
     /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/,
   );
-
   if (!twelveHour) {
     throw new Error("Event time must be in a valid 12-hour or 24-hour format.");
   }
@@ -115,7 +110,6 @@ const eventSchema = new Schema<IEvent>(
   },
 );
 
-// Keep a unique slug and regenerate it only when the title changes.
 eventSchema.pre("save", async function () {
   const invalidFields: string[] = [];
 
@@ -130,7 +124,6 @@ eventSchema.pre("save", async function () {
   if (!isNonEmptyString(this.mode)) invalidFields.push("mode");
   if (!isNonEmptyString(this.audience)) invalidFields.push("audience");
   if (!isNonEmptyString(this.organizer)) invalidFields.push("organizer");
-
   if (!isNonEmptyStringArray(this.agenda)) invalidFields.push("agenda");
   if (!isNonEmptyStringArray(this.tags)) invalidFields.push("tags");
 
