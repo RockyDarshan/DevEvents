@@ -174,8 +174,12 @@
   #event-card {
     @apply flex flex-col gap-3;
 
+    .poster-wrapper {
+      @apply relative h-[300px] w-full overflow-hidden rounded-lg;
+    }
+
     .poster {
-      @apply h-[300px] w-full rounded-lg object-cover;
+      @apply object-cover;
     }
 
     .title {
