@@ -1,16 +1,22 @@
 import EventCard from '@/components/EventCard'
 import ExploreBtn from '@/components/ExploreBtn'
-import { IEvent } from '@/database';
+import { IEvent, Event } from '@/database/event.model';
+import { connectToDatabase } from '@/lib/mongodb';
 import { cacheLife } from 'next/cache';
-
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 const Home = async () => {
   'use cache';
   cacheLife('hours');
-  const apiUrl = new URL('/api/events', baseUrl).toString();
-  const response = await fetch(apiUrl);
-  const { events } = await response.json();
+
+  await connectToDatabase();
+  const rawEvents = await Event.find({}).lean();
+
+  const events: IEvent[] = rawEvents.map((e) => ({
+    ...(e as unknown as IEvent),
+    _id: String(e._id),
+    createdAt: e.createdAt ? String(e.createdAt) : "",
+    updatedAt: e.updatedAt ? String(e.updatedAt) : "",
+  }));
 
   return (
     <section className="pt-0">
@@ -27,17 +33,17 @@ const Home = async () => {
       </div>
 
       <div className="mt-20 space-y-7">
- <h3>Featured Events</h3>
- <ul className="events">
-  {events && events.length > 0 && events.map((event:IEvent) => (
-    <li key={event.title} className='list-none'> 
-     <EventCard {...event} time={event.time ?? ''} />
-    </li>
-  ))}
- </ul>
+        <h3>Featured Events</h3>
+        <ul className="events">
+          {events && events.length > 0 && events.map((event: IEvent) => (
+            <li key={event.slug} className="list-none">
+              <EventCard {...event} time={event.time ?? ''} />
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
-  )
-}
+  );
+};
 
-export default Home
+export default Home;
