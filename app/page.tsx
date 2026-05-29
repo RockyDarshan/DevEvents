@@ -2,12 +2,9 @@ import EventCard from '@/components/EventCard'
 import ExploreBtn from '@/components/ExploreBtn'
 import { IEvent, Event } from '@/database/event.model';
 import { connectToDatabase } from '@/lib/mongodb';
-import { cacheLife } from 'next/cache';
+import { Suspense } from 'react';
 
-const Home = async () => {
-  'use cache';
-  cacheLife('hours');
-
+const EventList = async () => {
   await connectToDatabase();
   const rawEvents = await Event.find({}).lean();
 
@@ -18,6 +15,20 @@ const Home = async () => {
     updatedAt: e.updatedAt ? String(e.updatedAt) : "",
   }));
 
+  if (!events || events.length === 0) return null;
+
+  return (
+    <ul className="events">
+      {events.map((event: IEvent) => (
+        <li key={event.slug} className="list-none">
+          <EventCard {...event} time={event.time ?? ''} />
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+const Home = () => {
   return (
     <section className="pt-0">
       <h1 className="text-center">
@@ -31,16 +42,11 @@ const Home = async () => {
       <div className="flex justify-center mt-8">
         <ExploreBtn />
       </div>
-
       <div className="mt-20 space-y-7">
         <h3>Featured Events</h3>
-        <ul className="events">
-          {events && events.length > 0 && events.map((event: IEvent) => (
-            <li key={event.slug} className="list-none">
-              <EventCard {...event} time={event.time ?? ''} />
-            </li>
-          ))}
-        </ul>
+        <Suspense fallback={<p>Loading events...</p>}>
+          <EventList />
+        </Suspense>
       </div>
     </section>
   );
