@@ -35,7 +35,7 @@ const Navbar = () => {
             <div className="w-10 h-10 rounded-full bg-linear-to-r from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-cyan-500/20">
               <Image src="/icons/logo.png" alt="logo" width={22} height={22} />
             </div>
-            <p className="font-bold text-lg hidden sm:block">DevEvent</p>
+            <p className="font-bold text-lg hidden sm:block">CodeRift</p>
           </Link>
 
           {/* Desktop Menu */}
