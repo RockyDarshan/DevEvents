@@ -1,33 +1,7 @@
-import EventCard from '@/components/EventCard'
 import ExploreBtn from '@/components/ExploreBtn'
-import { IEvent, Event } from '@/database/event.model';
-import { connectToDatabase } from '@/lib/mongodb';
+import FeaturedEvents from '@/components/FeaturedEvents'
 import { Suspense } from 'react';
 import Link from 'next/link';
-
-const EventList = async () => {
-  await connectToDatabase();
-  const rawEvents = await Event.find({}).lean();
-
-  const events: IEvent[] = rawEvents.map((e) => ({
-    ...(e as unknown as IEvent),
-    _id: String(e._id),
-    createdAt: e.createdAt ? String(e.createdAt) : "",
-    updatedAt: e.updatedAt ? String(e.updatedAt) : "",
-  }));
-
-  if (!events || events.length === 0) return null;
-
-  return (
-    <ul className="events">
-      {events.map((event: IEvent) => (
-        <li key={event.slug} className="list-none">
-          <EventCard {...event} time={event.time ?? ''} />
-        </li>
-      ))}
-    </ul>
-  );
-};
 
 const Home = () => {
   return (
@@ -38,7 +12,7 @@ const Home = () => {
           <br />
           Event you can&apos;t miss!
         </h1>
-        <p className="text-center mt-5">
+        <p className="text-center mt-5 text-white/70">
           Hackathons, Meetups and Conferences, All in One Place
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
@@ -50,14 +24,13 @@ const Home = () => {
             Create Event
           </Link>
         </div>
-        <div className="mt-20 space-y-7">
-          <h3>Featured Events</h3>
-          <Suspense fallback={<p>Loading events...</p>}>
-            <EventList />
+        <div className="mt-20">
+          <Suspense fallback={<p className="text-center text-white/70 py-12">Loading events...</p>}>
+            <FeaturedEvents />
           </Suspense>
         </div>
       </section>
-      </>
+    </>
   );
 };
 

@@ -1,11 +1,8 @@
 'use client'
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import posthog from 'posthog-js'
-
-interface EventSearchProps {
-  onSearch: (query: string, filters: { category?: string; location?: string; sortBy?: string }) => void
-}
 
 export const CATEGORIES = [
   'All',
@@ -17,7 +14,8 @@ export const CATEGORIES = [
   'Summit'
 ]
 
-const EventSearch = ({ onSearch }: EventSearchProps) => {
+const EventSearch = () => {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
   const [location, setLocation] = useState('')
@@ -31,12 +29,14 @@ const EventSearch = ({ onSearch }: EventSearchProps) => {
       sortBy
     })
 
-    onSearch(query, {
-      category: category !== 'All' ? category : undefined,
-      location,
-      sortBy
-    })
-  }, [query, category, location, sortBy, onSearch])
+    const params = new URLSearchParams()
+    if (query) params.set('q', query)
+    if (category && category !== 'All') params.set('category', category)
+    if (location) params.set('location', location)
+    if (sortBy) params.set('sortBy', sortBy)
+
+    router.push(`/events?${params.toString()}`)
+  }, [query, category, location, sortBy, router])
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

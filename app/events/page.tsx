@@ -4,8 +4,6 @@ import EventCard from '@/components/EventCard'
 import { IEvent, Event } from '@/database/event.model'
 import { connectToDatabase } from '@/lib/mongodb'
 
-export const dynamic = 'force-dynamic'
-
 interface SearchParams {
   q?: string
   category?: string
@@ -18,7 +16,7 @@ interface EventsListProps {
 }
 
 interface EventsPageProps {
-  searchParams: Promise<SearchParams>
+  searchParams: SearchParams
 }
 
 const EventsList = async ({ searchParams }: EventsListProps) => {
@@ -73,16 +71,7 @@ const EventsList = async ({ searchParams }: EventsListProps) => {
         <p className="text-white/70">Discover and join amazing dev events</p>
       </div>
 
-      <EventSearch
-        onSearch={(query, filters) => {
-          const params = new URLSearchParams()
-          if (query) params.set('q', query)
-          if (filters.category) params.set('category', filters.category)
-          if (filters.location) params.set('location', filters.location)
-          if (filters.sortBy) params.set('sortBy', filters.sortBy)
-          window.location.href = `/events?${params.toString()}`
-        }}
-      />
+      <EventSearch />
 
       {events.length === 0 ? (
         <div className="text-center py-12">
@@ -104,14 +93,16 @@ const EventsList = async ({ searchParams }: EventsListProps) => {
   )
 }
 
-const EventsPage = async ({ searchParams }: EventsPageProps) => {
-  const resolvedSearchParams = await searchParams
+const EventsContent = async ({ searchParams }: EventsPageProps) => {
+  return <EventsList searchParams={searchParams} />
+}
 
+const EventsPage = ({ searchParams }: EventsPageProps) => {
   return (
     <section className="pt-20 pb-20">
       <div className="max-w-6xl mx-auto px-4">
         <Suspense fallback={<div className="text-center py-12"><p>Loading events...</p></div>}>
-          <EventsList searchParams={resolvedSearchParams} />
+          <EventsContent searchParams={searchParams} />
         </Suspense>
       </div>
     </section>
@@ -119,3 +110,4 @@ const EventsPage = async ({ searchParams }: EventsPageProps) => {
 }
 
 export default EventsPage
+
