@@ -1,34 +1,17 @@
 import EventCard from '@/components/EventCard'
 import ExploreBtn from '@/components/ExploreBtn'
-import { IEvent, Event } from '@/database/event.model';
-import { connectToDatabase } from '@/lib/mongodb';
-import { Suspense } from 'react';
+import { IEvent } from '@/database';
+import { cacheLife } from 'next/cache';
 
-const EventList = async () => {
-  await connectToDatabase();
-  const rawEvents = await Event.find({}).lean();
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
-  const events: IEvent[] = rawEvents.map((e) => ({
-    ...(e as unknown as IEvent),
-    _id: String(e._id),
-    createdAt: e.createdAt ? String(e.createdAt) : "",
-    updatedAt: e.updatedAt ? String(e.updatedAt) : "",
-  }));
+const Home = async () => {
+  'use cache';
+  cacheLife('hours');
+  const apiUrl = new URL('/api/events', baseUrl).toString();
+  const response = await fetch(apiUrl);
+  const { events } = await response.json();
 
-  if (!events || events.length === 0) return null;
-
-  return (
-    <ul className="events">
-      {events.map((event: IEvent) => (
-        <li key={event.slug} className="list-none">
-          <EventCard {...event} time={event.time ?? ''} />
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-const Home = () => {
   return (
     <section className="pt-0">
       <h1 className="text-center">
@@ -42,14 +25,19 @@ const Home = () => {
       <div className="flex justify-center mt-8">
         <ExploreBtn />
       </div>
+
       <div className="mt-20 space-y-7">
-        <h3>Featured Events</h3>
-        <Suspense fallback={<p>Loading events...</p>}>
-          <EventList />
-        </Suspense>
+ <h3>Featured Events</h3>
+ <ul className="events">
+  {events && events.length > 0 && events.map((event:IEvent) => (
+    <li key={event.title} className='list-none'> 
+     <EventCard {...event} time={event.time ?? ''} />
+    </li>
+  ))}
+ </ul>
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default Home;
+export default Home

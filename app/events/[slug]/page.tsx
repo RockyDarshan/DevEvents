@@ -1,27 +1,21 @@
 import BookEvent from "@/components/BookEvent";
 import EventCard from "@/components/EventCard";
-import { IEvent, Event } from "@/database/event.model";
+import { IEvent } from "@/database/event.model";
 import { getSimilarEventsBySlug } from "@/lib/actions/event.actions";
-import { connectToDatabase } from "@/lib/mongodb";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 
-const getEvent = cache(async (slug: string): Promise<IEvent | null> => {
-  try {
-    await connectToDatabase();
-    const event = await Event.findOne({ slug }).lean();
-    if (!event) return null;
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
-    return {
-      ...(event as unknown as IEvent),
-      _id: String(event._id),
-      createdAt: event.createdAt ? String(event.createdAt) : "",
-      updatedAt: event.updatedAt ? String(event.updatedAt) : "",
-    };
-  } catch {
-    return null;
-  }
+const getEvent = cache(async (slug: string) => {
+  const apiUrl = new URL(
+    `/api/events/${encodeURIComponent(slug)}`,
+    baseUrl,
+  ).toString();
+  const request = await fetch(apiUrl, { next: { revalidate: 60 } });
+  if (!request.ok) return null;
+  return request.json();
 });
 
 const EventDetailsItem = ({ icon, alt, label }: { icon: string; alt: string; label: string }) => (
@@ -71,10 +65,12 @@ const SimilarEvents = async ({ slug }: { slug: string }) => {
   );
 };
 
+// Inner component does all the async work
 const EventContent = async ({ slug }: { slug: string }) => {
-  const event = await getEvent(slug);
-  if (!event) return notFound();
+  const data = await getEvent(slug);
+  if (!data) return notFound();
 
+  const { event } = data;
   const {
     title, image, overview, description, organizer,
     date, time, location, mode, agenda = [], audience, tags = [],
@@ -143,15 +139,7 @@ const EventContent = async ({ slug }: { slug: string }) => {
   );
 };
 
-const EventParamsResolver = async ({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) => {
-  const { slug } = await params;
-  return <EventContent slug={slug} />;
-};
-
+// Outer shell just resolves params and hands off to Suspense
 const EventDetailsPage = ({
   params,
 }: {
@@ -162,6 +150,16 @@ const EventDetailsPage = ({
       <EventParamsResolver params={params} />
     </Suspense>
   );
+};
+
+// Tiny bridge component that awaits params then renders EventContent
+const EventParamsResolver = async ({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) => {
+  const { slug } = await params;
+  return <EventContent slug={slug} />;
 };
 
 export default EventDetailsPage;
