@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Schibsted_Grotesk, Martian_Mono, Geist } from "next/font/google";
+import { Suspense } from 'react'
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import LightRays from "@/components/LightRays";
@@ -34,7 +35,9 @@ export default function RootLayout({
       className={cn("min-h-screen", "h-full", "antialiased", schibstedGrotesk.variable, martianMono.variable, "font-sans", geist.variable)}
     >
       <body className="min-h-full flex flex-col">
-        <Navbar />
+        <Suspense fallback={<div />}> 
+          <Navbar />
+        </Suspense>
 <div className="absolute inset-0 top-0 z-[-1] min-h-screen">
   <LightRays
 
