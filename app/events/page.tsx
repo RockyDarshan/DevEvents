@@ -16,7 +16,7 @@ interface EventsListProps {
 }
 
 interface EventsPageProps {
-  searchParams: SearchParams
+  searchParams: Promise<SearchParams>
 }
 
 const EventsList = async ({ searchParams }: EventsListProps) => {
@@ -94,7 +94,8 @@ const EventsList = async ({ searchParams }: EventsListProps) => {
 }
 
 const EventsContent = async ({ searchParams }: EventsPageProps) => {
-  return <EventsList searchParams={searchParams} />
+  const resolvedSearchParams = await searchParams
+  return <EventsList searchParams={resolvedSearchParams} />
 }
 
 const EventsPage = ({ searchParams }: EventsPageProps) => {
