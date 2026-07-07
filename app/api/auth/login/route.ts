@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { connectToDatabase } from "@/lib/actions/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 import { User } from "@/database";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
