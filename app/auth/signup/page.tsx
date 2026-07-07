@@ -39,37 +39,37 @@ const SignupPage = () => {
       return
     }
 
-    try {
-      posthog.capture('signup_attempted', {
-        email: formData.email,
-        name: formData.name,
-      })
+   try {
+  posthog.capture('signup_attempted', { email: formData.email, name: formData.name })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+  const res = await fetch('/api/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+    }),
+  })
 
-      // Mock registration
-      localStorage.setItem('user', JSON.stringify({
-        name: formData.name,
-        email: formData.email,
-        loggedIn: true,
-      }))
+  const data = await res.json()
 
-      setSuccess('Account created successfully! Redirecting...')
-      posthog.capture('signup_successful', {
-        email: formData.email,
-        name: formData.name,
-      })
+  if (!res.ok) {
+    throw new Error(data.error || 'Signup failed.')
+  }
 
-      setTimeout(() => {
-        window.location.href = '/'
-      }, 1500)
-    } catch (err) {
-      setError('Signup failed. Please try again.')
-      posthog.capture('signup_failed', { error: err })
-    } finally {
-      setLoading(false)
-    }
+  setSuccess('Account created successfully! Redirecting...')
+  posthog.capture('signup_successful', { email: formData.email, name: formData.name })
+
+  setTimeout(() => {
+    window.location.href = '/auth/login'
+  }, 1500)
+} catch (err) {
+  setError(err instanceof Error ? err.message : 'Signup failed. Please try again.')
+  posthog.capture('signup_failed', { error: err })
+} finally {
+  setLoading(false)
+}
   }
 
   return (
