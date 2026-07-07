@@ -24,32 +24,40 @@ const LoginPage = () => {
     setLoading(true)
     setError('')
 
-    try {
-      posthog.capture('login_attempted', {
-        email: formData.email,
-      })
+  try {
+  posthog.capture('login_attempted', { email: formData.email })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: formData.email,
+      password: formData.password,
+    }),
+  })
 
-      // Mock authentication
-      localStorage.setItem('user', JSON.stringify({
-        email: formData.email,
-        loggedIn: true,
-      }))
+  const data = await res.json()
 
-      setSuccess('Login successful! Redirecting...')
-      posthog.capture('login_successful', { email: formData.email })
+  if (!res.ok) {
+    throw new Error(data.error || 'Login failed.')
+  }
 
-      setTimeout(() => {
-        window.location.href = '/'
-      }, 1500)
-    } catch (err) {
-      setError('Login failed. Please try again.')
-      posthog.capture('login_failed', { error: err })
-    } finally {
-      setLoading(false)
-    }
+  // Store real JWT instead of mock object
+  localStorage.setItem('token', data.token)
+  localStorage.setItem('user', JSON.stringify(data.user))
+
+  setSuccess('Login successful! Redirecting...')
+  posthog.capture('login_successful', { email: formData.email })
+
+  setTimeout(() => {
+    window.location.href = '/'
+  }, 1500)
+} catch (err) {
+  setError(err instanceof Error ? err.message : 'Login failed. Please try again.')
+  posthog.capture('login_failed', { error: err })
+} finally {
+  setLoading(false)
+}
   }
 
   return (
