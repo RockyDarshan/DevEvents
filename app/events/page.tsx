@@ -5,11 +5,11 @@ import { Event } from '@/database/event.model';
 import { connectToDatabase } from '@/lib/mongodb';
 import { escapeRegex } from "@/lib/event-utils";
 import { serializeEvent } from "@/lib/serialize";
-import Pagination from "@/components/Pagination";
-
+import Pagination from '@/components/Pagination';
 const PAGE_SIZE = 9;
 
 interface SearchParams {
+  [key: string]: string | undefined;
   q?: string;
   category?: string;
   location?: string;
