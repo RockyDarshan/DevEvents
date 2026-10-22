@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { connectToDatabase } from "@/lib/mongodb";
 import { User } from "@/database";
+import { loginSchema, formatZodError } from "@/lib/validators";
+
 import {
   signSession,
   SESSION_COOKIE,
@@ -9,9 +11,17 @@ import {
 } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
-  try {
-    const { email, password } = await req.json();
+  const body = await req.json().catch(() => null);
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: formatZodError(parsed.error) },
+      { status: 400 },
+    );
+  }
+  const { email, password } = parsed.data;
 
+  try {
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email and password are required." },
