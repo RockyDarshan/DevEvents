@@ -3,6 +3,7 @@ import { Event, type IEvent } from "./event.model";
 
 export interface IBooking {
   eventId: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
   email: string;
   createdAt: Date;
   updatedAt: Date;
@@ -18,6 +19,13 @@ const bookingSchema = new Schema<IBooking>(
       required: true,
       index: true,
     },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
     email: {
       type: String,
       required: true,
@@ -34,6 +42,8 @@ const bookingSchema = new Schema<IBooking>(
     strict: "throw",
   },
 );
+
+bookingSchema.index({ eventId: 1, email: 1 }, { unique: true });
 
 // Validate that the referenced event exists before persisting a booking.
 bookingSchema.pre("save", async function () {

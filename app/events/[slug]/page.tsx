@@ -6,6 +6,8 @@ import { connectToDatabase } from "@/lib/mongodb";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
+import { Booking } from "@/database/booking.model";
+import { getCurrentUser } from "@/lib/auth";
 
 const getEvent = cache(async (slug: string): Promise<IEvent | null> => {
   try {
@@ -75,6 +77,8 @@ const EventContent = async ({ slug }: { slug: string }) => {
   const event = await getEvent(slug);
   if (!event) return notFound();
 
+
+
   const {
     title, image, overview, description, organizer,
     date, time, location, mode, agenda = [], audience, tags = [],
@@ -83,7 +87,8 @@ const EventContent = async ({ slug }: { slug: string }) => {
   if (!description) return notFound();
 
   const eventId = String(event._id);
-  const bookings = 10;
+   const user = await getCurrentUser();
+const bookings = await Booking.countDocuments({ eventId: event._id });
 
   return (
     <section id="event">
@@ -128,7 +133,7 @@ const EventContent = async ({ slug }: { slug: string }) => {
             ) : (
               <p className="text-sm">Be the first to book your spot for this exciting event!</p>
             )}
-            <BookEvent eventId={eventId} slug={slug} />
+            <BookEvent eventId={eventId} slug={slug} userEmail={user?.email || null} />
           </div>
         </aside>
       </div>

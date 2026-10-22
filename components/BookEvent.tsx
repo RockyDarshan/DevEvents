@@ -1,45 +1,62 @@
-'use client'
+"use client";
 
-import { createBooking } from "@/lib/actions/booking.actions";
+import Link from "next/link";
+import { useState, useTransition } from "react";
 import posthog from "posthog-js";
-import { useState } from "react";
+import { createBooking } from "@/lib/actions/booking.actions";
 
-const BookEvent = ({ eventId, slug }: { eventId: string; slug: string }) => {
-  const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+const messages = {
+  unauthenticated: "Please sign in to book.",
+  already_booked: "You have already booked this event.",
+  failed: "Something went wrong. Please try again.",
+} as const;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // was missing — this also fixes the unused var warning
-    const { success } = await createBooking({ email, eventId, slug });
+const BookEvent = ({
+  eventId,
+  slug,
+  userEmail,
+}: {
+  eventId: string;
+  slug: string;
+  userEmail: string | null;
+}) => {
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
 
-    if (success) {
-      setSubmitted(true);
-      posthog.capture("event_booked", { eventId, slug, email });
-    } else {
-      console.error("Booking failed:");
-      posthog.captureException('Booking creation failed');
-    }
+  if (!userEmail) {
+    return (
+      <p className="text-sm">
+        <Link href="/auth/login" className="text-blue-400 hover:text-blue-300">Sign in</Link> to book your spot.
+      </p>
+    );
+  }
+  if (done) return <p className="text-sm">You are booked for this event.</p>;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    startTransition(async () => {
+      const result = await createBooking({ eventId, slug });
+      if (result.success) {
+        setDone(true);
+        posthog.capture("event_booked", { eventId, slug });
+      } else {
+        setError(messages[result.error]);
+        posthog.capture("event_booking_failed", { eventId, reason: result.error });
+      }
+    });
   };
 
   return (
     <div id="book-event">
-      {submitted ? (
-        <p className="text-sm">Thank you for signing up</p>
-      ) : (
-        <form onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="email">Email Address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              id="email"
-              placeholder="Enter your Email Address"
-            />
-          </div>
-          <button type="submit" className="button-submit">Submit</button>
-        </form>
-      )}
+      <form onSubmit={handleSubmit}>
+        <p className="text-sm">Booking as {userEmail}</p>
+        <button type="submit" disabled={pending}>
+          {pending ? "Booking..." : "Book my spot"}
+        </button>
+        {error && <p className="text-sm text-red-400">{error}</p>}
+      </form>
     </div>
   );
 };
