@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import LightRays from "@/components/LightRays";
-import Navbar from "@/components/Navbar";
+import NavbarServer from "@/components/NavbarServer";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -36,7 +36,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Suspense fallback={<div />}> 
-          <Navbar />
+          <NavbarServer  />
         </Suspense>
 <div className="absolute inset-0 top-0 z-[-1] min-h-screen">
   <LightRays

@@ -2,6 +2,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { v2 as cloudinary } from "cloudinary";
 import { Event } from "@/database/event.model";
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 
 const slugify = (value: string): string =>
   value
@@ -90,6 +91,14 @@ const parseFormData = async (req: NextRequest) => {
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json(
+        { message: "Not authenticated." },
+        { status: 401 },
+      );
+    }
+
     await connectToDatabase();
     const contentType = req.headers.get("content-type") ?? "";
     let event: Record<string, unknown>;
