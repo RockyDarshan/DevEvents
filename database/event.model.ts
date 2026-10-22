@@ -1,4 +1,5 @@
 import mongoose, { Schema, type HydratedDocument, type Model } from "mongoose";
+import { normalizeDate, normalizeTime, slugify } from "@/lib/event-utils";
 
 export interface IEvent {
   _id: string;
@@ -16,70 +17,12 @@ export interface IEvent {
   agenda: string[];
   organizer: string;
   tags: string[];
-  createdAt: string; // changed from Date
-  updatedAt: string; // changed from Date
+  createdBy?: mongoose.Types.ObjectId | string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type EventDocument = HydratedDocument<IEvent>;
-
-const slugify = (value: string): string =>
-  value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-const normalizeDate = (value: string): string => {
-  const parsedDate = new Date(value);
-  if (Number.isNaN(parsedDate.getTime())) {
-    throw new Error("Event date must be a valid date string.");
-  }
-  return parsedDate.toISOString().slice(0, 10);
-};
-
-const normalizeTime = (value: string): string => {
-  const trimmed = value.trim().toUpperCase();
-  const simple24Hour = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-
-  if (simple24Hour) {
-    const hours = Number(simple24Hour[1]);
-    const minutes = Number(simple24Hour[2]);
-    const seconds = Number(simple24Hour[3] ?? 0);
-    if (hours > 23 || minutes > 59 || seconds > 59) {
-      throw new Error(
-        "Event time must be in a valid HH:mm or HH:mm:ss format.",
-      );
-    }
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  const twelveHour = trimmed.match(
-    /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/,
-  );
-  if (!twelveHour) {
-    throw new Error("Event time must be in a valid 12-hour or 24-hour format.");
-  }
-
-  const hours = Number(twelveHour[1]);
-  const minutes = Number(twelveHour[2]);
-  const seconds = Number(twelveHour[3] ?? 0);
-  const meridiem = twelveHour[4];
-
-  if (hours < 1 || hours > 12 || minutes > 59 || seconds > 59) {
-    throw new Error("Event time must be in a valid 12-hour format.");
-  }
-
-  const normalizedHours =
-    meridiem === "AM"
-      ? hours === 12
-        ? 0
-        : hours
-      : hours === 12
-        ? 12
-        : hours + 12;
-
-  return `${String(normalizedHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-};
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
@@ -101,6 +44,7 @@ const eventSchema = new Schema<IEvent>(
     mode: { type: String, required: true, trim: true },
     audience: { type: String, required: true, trim: true },
     agenda: { type: [String], required: true },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", index: true },
     organizer: { type: String, required: true, trim: true },
     tags: { type: [String], required: true },
   },
@@ -110,7 +54,36 @@ const eventSchema = new Schema<IEvent>(
   },
 );
 
-eventSchema.pre("save", async function () {
+// Indexes
+eventSchema.index({ slug: 1 }, { unique: true });
+eventSchema.index({ date: 1, time: 1 });
+
+// Use pre("validate") to format, slugify, and validate before internal Mongoose validation fires
+eventSchema.pre("validate", function () {
+  // 1. Compute slug and format utility inputs if fields exist
+  if (this.title && (this.isModified("title") || !this.slug)) {
+    this.slug = slugify(this.title);
+  }
+
+  if (this.date && this.isModified("date")) {
+    try {
+      this.date = normalizeDate(this.date);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Validation error on date: ${message}`);
+    }
+  }
+
+  if (this.time && this.isModified("time")) {
+    try {
+      this.time = normalizeTime(this.time);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Validation error on time: ${message}`);
+    }
+  }
+
+  // 2. Comprehensive validation checks
   const invalidFields: string[] = [];
 
   if (!isNonEmptyString(this.title)) invalidFields.push("title");
@@ -130,16 +103,7 @@ eventSchema.pre("save", async function () {
   if (invalidFields.length > 0) {
     throw new Error(`Invalid required fields: ${invalidFields.join(", ")}`);
   }
-
-  if (this.isModified("title")) {
-    this.slug = slugify(this.title);
-  }
-
-  this.date = normalizeDate(this.date);
-  this.time = normalizeTime(this.time);
 });
-
-eventSchema.index({ slug: 1 }, { unique: true });
 
 export const Event: Model<IEvent> =
   mongoose.models.Event || mongoose.model<IEvent>("Event", eventSchema);

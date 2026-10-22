@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { cache, Suspense } from "react";
 import { Booking } from "@/database/booking.model";
 import { getCurrentUser } from "@/lib/auth";
+import OwnerActions from "@/components/OwnerActions";
 
 const getEvent = cache(async (slug: string): Promise<IEvent | null> => {
   try {
@@ -89,10 +90,13 @@ const EventContent = async ({ slug }: { slug: string }) => {
   const eventId = String(event._id);
    const user = await getCurrentUser();
 const bookings = await Booking.countDocuments({ eventId: event._id });
+const isOwner = !!user && !!event.createdBy && String(event.createdBy) === user.userId;
+
 
   return (
     <section id="event">
       <div className="header">
+        {isOwner && <OwnerActions slug={slug} />}
         <h1>{title}</h1>
         <p className="mt-1">{description}</p>
       </div>

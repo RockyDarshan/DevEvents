@@ -162,6 +162,8 @@ export async function POST(req: NextRequest) {
       event.image = uploadResult.secure_url;
     }
 
+    event.createdBy = user.userId;
+
     const createdEvent = await Event.create(event);
 
     return NextResponse.json(
