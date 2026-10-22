@@ -9,6 +9,7 @@ import { cache, Suspense } from "react";
 import { Booking } from "@/database/booking.model";
 import { getCurrentUser } from "@/lib/auth";
 import OwnerActions from "@/components/OwnerActions";
+import { serializeEvent } from "@/lib/serialize"; // 1. Added serialization utility import
 
 const getEvent = cache(async (slug: string): Promise<IEvent | null> => {
   try {
@@ -16,19 +17,15 @@ const getEvent = cache(async (slug: string): Promise<IEvent | null> => {
     const event = await Event.findOne({ slug }).lean();
     if (!event) return null;
 
-    return {
-      ...(event as unknown as IEvent),
-      _id: String(event._id),
-      createdAt: event.createdAt ? String(event.createdAt) : "",
-      updatedAt: event.updatedAt ? String(event.updatedAt) : "",
-    };
+    // 2. Swapped old manual array parsing with serializeEvent helper
+    return serializeEvent(event);
   } catch {
     return null;
   }
 });
 
 const EventDetailsItem = ({ icon, alt, label }: { icon: string; alt: string; label: string }) => (
-  <div className="flex-row-gap-2 items-center">
+  <div className="flex flex-row gap-2 items-center">
     <Image src={icon} alt={alt} width={17} height={17} />
     <p>{label}</p>
   </div>
@@ -58,7 +55,7 @@ const SimilarEvents = async ({ slug }: { slug: string }) => {
   if (similarEvents.length === 0) return null;
 
   return (
-    <div className="events">
+    <div className="events grid grid-cols-1 md:grid-cols-3 gap-6">
       {similarEvents.map((similarEvent: IEvent) => (
         <EventCard
           key={similarEvent._id}
@@ -67,7 +64,7 @@ const SimilarEvents = async ({ slug }: { slug: string }) => {
           slug={similarEvent.slug}
           location={similarEvent.location}
           date={similarEvent.date}
-          time={similarEvent.time}
+          time={similarEvent.time ?? ""}
         />
       ))}
     </div>
@@ -78,8 +75,6 @@ const EventContent = async ({ slug }: { slug: string }) => {
   const event = await getEvent(slug);
   if (!event) return notFound();
 
-
-
   const {
     title, image, overview, description, organizer,
     date, time, location, mode, agenda = [], audience, tags = [],
@@ -88,10 +83,9 @@ const EventContent = async ({ slug }: { slug: string }) => {
   if (!description) return notFound();
 
   const eventId = String(event._id);
-   const user = await getCurrentUser();
-const bookings = await Booking.countDocuments({ eventId: event._id });
-const isOwner = !!user && !!event.createdBy && String(event.createdBy) === user.userId;
-
+  const user = await getCurrentUser();
+  const bookings = await Booking.countDocuments({ eventId: event._id });
+  const isOwner = !!user && !!event.createdBy && String(event.createdBy) === user.userId;
 
   return (
     <section id="event">
@@ -105,12 +99,12 @@ const isOwner = !!user && !!event.createdBy && String(event.createdBy) === user.
         <div className="content">
           <Image src={image} alt="Event Banner" width={800} height={400} className="banner" priority />
 
-          <section className="flex-col-gap-2">
+          <section className="flex flex-col gap-2">
             <h2>Overview</h2>
             <p>{overview}</p>
           </section>
 
-          <section className="flex-col-gap-2">
+          <section className="flex flex-col gap-2">
             <h2>Event Details</h2>
             <EventDetailsItem icon="/icons/calendar.svg" alt="calendar" label={date} />
             <EventDetailsItem icon="/icons/clock.svg" alt="clock" label={time} />
@@ -121,7 +115,7 @@ const isOwner = !!user && !!event.createdBy && String(event.createdBy) === user.
 
           <EventAgenda agendaItems={agenda} />
 
-          <section className="flex-col-gap-2">
+          <section className="flex flex-col gap-2">
             <h2>About the Organizer</h2>
             <p>{organizer}</p>
           </section>
