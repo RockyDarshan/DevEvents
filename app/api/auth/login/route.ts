@@ -1,15 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { connectToDatabase } from "@/lib/mongodb";
 import { User } from "@/database";
+import { loginSchema, formatZodError } from "@/lib/validators";
 
-const JWT_SECRET = process.env.JWT_SECRET as string;
+import {
+  signSession,
+  SESSION_COOKIE,
+  SESSION_COOKIE_OPTIONS,
+} from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
-  try {
-    const { email, password } = await req.json();
+  const body = await req.json().catch(() => null);
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: formatZodError(parsed.error) },
+      { status: 400 },
+    );
+  }
+  const { email, password } = parsed.data;
 
+  try {
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email and password are required." },
@@ -35,17 +47,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const token = jwt.sign(
-      { userId: user._id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: "7d" },
-    );
-
-    return NextResponse.json({
-      message: "Login successful.",
-      token,
-      user: { id: user._id, name: user.name, email: user.email },
+    const token = signSession({
+      userId: String(user._id),
+      email: user.email,
+      name: user.name,
     });
+    const res = NextResponse.json({
+      message: "Login successful.",
+      user: { id: String(user._id), name: user.name, email: user.email },
+    });
+    res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+    return res;
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json(

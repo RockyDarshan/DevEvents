@@ -42,9 +42,9 @@ const LoginPage = () => {
     throw new Error(data.error || 'Login failed.')
   }
 
-  // Store real JWT instead of mock object
-  localStorage.setItem('token', data.token)
-  localStorage.setItem('user', JSON.stringify(data.user))
+ posthog.capture("login_attempted");
+// ...after a successful response:
+posthog.identify(data.user.id);
 
   setSuccess('Login successful! Redirecting...')
   posthog.capture('login_successful', { email: formData.email })
@@ -131,14 +131,12 @@ const LoginPage = () => {
           {/* Footer */}
           <div className="text-center space-y-2">
             <p className="text-white/70">
-              Don &apos t have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300">
                 Sign up
               </Link>
             </p>
-            <Link href="#" className="block text-sm text-white/50 hover:text-white/70">
-              Forgot password?
-            </Link>
+           
           </div>
         </div>
       </div>

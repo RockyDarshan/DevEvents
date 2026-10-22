@@ -1,4 +1,5 @@
 import mongoose, { Schema, type HydratedDocument, type Model } from "mongoose";
+import bcrypt from "bcryptjs";
 
 export interface IUser {
   _id: string;
@@ -28,6 +29,10 @@ const userSchema = new Schema<IUser>(
     strict: "throw",
   },
 );
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 10);
+});
 
 // userSchema.index({ email: 1 }, { unique: true });
 

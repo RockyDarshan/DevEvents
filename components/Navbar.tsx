@@ -2,16 +2,17 @@
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
+import {  useState } from "react"
 import posthog from "posthog-js"
 import { Menu, X, User } from "lucide-react"
 
-const Navbar = () => {
+
+const Navbar = ({ user }: { user: { name: string; email: string } | null }) => {
+  const isLoggedIn = !!user;
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
-  const isLoggedIn = typeof window !== 'undefined' ? !!localStorage.getItem('user') : false
 
-  const handleNavClick = (label: string) => {
+    const handleNavClick = (label: string) => {
     posthog.capture('navbar_link_clicked', { label })
     setIsOpen(false)
   }

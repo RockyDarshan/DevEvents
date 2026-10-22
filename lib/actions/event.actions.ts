@@ -2,6 +2,7 @@
 
 import { Event, IEvent } from "@/database/event.model";
 import { connectToDatabase } from "../mongodb";
+import { serializeEvent } from "@/lib/serialize"; // 1. Added import statement
 
 export const getSimilarEventsBySlug = async (
   slug: string,
@@ -12,17 +13,16 @@ export const getSimilarEventsBySlug = async (
     const event = await Event.findOne({ slug }).lean();
     if (!event) return [];
 
+    // 2. Updated database query to add .limit(3)
     const similarEvents = await Event.find({
       _id: { $ne: event._id },
       tags: { $in: (event.tags as string[]) || [] },
-    }).lean();
+    })
+      .limit(3)
+      .lean();
 
-    return similarEvents.map((e) => ({
-      ...(e as unknown as IEvent),
-      _id: String(e._id),
-      createdAt: e.createdAt ? String(e.createdAt) : "",
-      updatedAt: e.updatedAt ? String(e.updatedAt) : "",
-    }));
+    // 3. Updated mapping logic to use serializeEvent
+    return similarEvents.map(serializeEvent);
   } catch {
     return [];
   }

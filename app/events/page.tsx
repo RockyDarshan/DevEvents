@@ -1,68 +1,82 @@
-import { Suspense } from 'react'
-import EventSearch from '@/components/EventSearch'
-import EventCard from '@/components/EventCard'
-import { IEvent, Event } from '@/database/event.model'
-import { connectToDatabase } from '@/lib/mongodb'
+import { Suspense } from 'react';
+import EventSearch from '@/components/EventSearch';
+import EventCard from '@/components/EventCard';
+import { Event } from '@/database/event.model';
+import { connectToDatabase } from '@/lib/mongodb';
+import { escapeRegex } from "@/lib/event-utils";
+import { serializeEvent } from "@/lib/serialize";
+import Pagination from '@/components/Pagination';
+const PAGE_SIZE = 9;
 
 interface SearchParams {
-  q?: string
-  category?: string
-  location?: string
-  sortBy?: string
+  [key: string]: string | undefined;
+  q?: string;
+  category?: string;
+  location?: string;
+  sortBy?: string;
+  when?: string;
+  page?: string;
 }
 
 interface EventsListProps {
-  searchParams: SearchParams
+  searchParams: SearchParams;
 }
 
 interface EventsPageProps {
-  searchParams: Promise<SearchParams>
+  searchParams: Promise<SearchParams>;
 }
 
 const EventsList = async ({ searchParams }: EventsListProps) => {
-  await connectToDatabase()
+  await connectToDatabase();
 
-  const query: Record<string, unknown> = {}
-
-  // Search by title or description
-  if (searchParams.q) {
-    query.$or = [
-      { title: { $regex: searchParams.q, $options: 'i' } },
-      { description: { $regex: searchParams.q, $options: 'i' } },
-      { tags: { $in: [new RegExp(searchParams.q, 'i')] } }
-    ]
+  const query: Record<string, unknown> = {};
+  
+  // 1. Build Title / Description / Tags full text filter
+  const q = searchParams.q?.trim();
+  if (q) {
+    const rx = new RegExp(escapeRegex(q), "i");
+    query.$or = [{ title: rx }, { description: rx }, { tags: rx }];
   }
 
-  // Filter by category (tags)
-  if (searchParams.category && searchParams.category !== 'All') {
-    query.tags = searchParams.category
+  // 2. Build Category Filter
+  if (searchParams.category && searchParams.category !== "All") {
+    query.tags = { $regex: `^${escapeRegex(searchParams.category)}$`, $options: "i" };
   }
 
-  // Filter by location
-  if (searchParams.location) {
-    query.location = { $regex: searchParams.location, $options: 'i' }
+  // 3. Build Location Filter
+  if (searchParams.location?.trim()) {
+    query.location = { $regex: escapeRegex(searchParams.location.trim()), $options: "i" };
   }
 
-  // Build sort query
-  const sortQuery: Record<string, 1 | -1> = { date: -1, time: -1 }
-  if (searchParams.sortBy === 'oldest') {
-    sortQuery.date = 1
-    sortQuery.time = 1
-  } else if (searchParams.sortBy === 'alphabetical') {
-    sortQuery.date = 1
-    sortQuery.time = 1
-    sortQuery.title = 1
-  }
+  // 4. Build Date Filter
+  const today = new Date().toISOString().slice(0, 10);
+  const when = searchParams.when ?? "upcoming";
+  if (when === "upcoming") query.date = { $gte: today };
+  if (when === "past") query.date = { $lt: today };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rawEvents = await Event.find(query).sort(sortQuery as any).lean()
+  // 5. Build Sort Options
+  const sort: Record<string, 1 | -1> =
+    searchParams.sortBy === "newest" ? { createdAt: -1 }
+    : searchParams.sortBy === "alphabetical" ? { title: 1 }
+    : when === "past" ? { date: -1, time: -1 }
+    : { date: 1, time: 1 };
 
-  const events: IEvent[] = rawEvents.map((e) => ({
-    ...(e as unknown as IEvent),
-    _id: String(e._id),
-    createdAt: e.createdAt ? String(e.createdAt) : '',
-    updatedAt: e.updatedAt ? String(e.updatedAt) : '',
-  }))
+  // 6. Calculate Pagination Bounds
+  const page = Math.max(1, Number(searchParams.page) || 1);
+
+  // 7. Parallelized Database Operations
+  const [rawEvents, total] = await Promise.all([
+    Event.find(query)
+      .collation({ locale: "en", strength: 2 }) // Case-insensitive sorting
+      .sort(sort)
+      .skip((page - 1) * PAGE_SIZE)
+      .limit(PAGE_SIZE)
+      .lean(),
+    Event.countDocuments(query),
+  ]);
+
+  const events = rawEvents.map(serializeEvent);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="space-y-8">
@@ -78,37 +92,45 @@ const EventsList = async ({ searchParams }: EventsListProps) => {
           <p className="text-white/50 text-lg">No events found. Try adjusting your filters.</p>
         </div>
       ) : (
-        <div>
-          <p className="text-white/70 mb-4">{events.length} events found</p>
-          <ul className="events">
-            {events.map((event: IEvent) => (
+        <div className="space-y-6">
+          <p className="text-white/70 mb-4">{total} events found</p>
+          <ul className="events grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((event) => (
               <li key={event.slug} className="list-none">
-                <EventCard {...event} time={event.time ?? ''} />
+                <EventCard
+                  title={event.title}
+                  image={event.image}
+                  slug={event.slug}
+                  location={event.location}
+                  date={event.date}
+                  time={event.time ?? ""}
+                />
               </li>
             ))}
           </ul>
+          
+          <Pagination page={page} pages={pages} params={searchParams} />
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 const EventsContent = async ({ searchParams }: EventsPageProps) => {
-  const resolvedSearchParams = await searchParams
-  return <EventsList searchParams={resolvedSearchParams} />
-}
+  const resolvedSearchParams = await searchParams;
+  return <EventsList searchParams={resolvedSearchParams} />;
+};
 
 const EventsPage = ({ searchParams }: EventsPageProps) => {
   return (
     <section className="pt-20 pb-20">
       <div className="max-w-6xl mx-auto px-4">
-        <Suspense fallback={<div className="text-center py-12"><p>Loading events...</p></div>}>
+        <Suspense fallback={<div className="text-center py-12"><p className="text-white/50">Loading events...</p></div>}>
           <EventsContent searchParams={searchParams} />
         </Suspense>
       </div>
     </section>
-  )
-}
+  );
+};
 
-export default EventsPage
-
+export default EventsPage;

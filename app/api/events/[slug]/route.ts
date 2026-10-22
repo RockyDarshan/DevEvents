@@ -1,117 +1,95 @@
-import { connectToDatabase } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/lib/mongodb";
 import { Event } from "@/database/event.model";
-import type { IEvent } from "@/database/event.model";
+import { Booking } from "@/database/booking.model";
+import { getCurrentUser } from "@/lib/auth";
+import { eventSchema, formatZodError } from "@/lib/validators"; // created in Step 4
+import { serializeEvent } from "@/lib/serialize";
 
-const isValidSlug = (value: string | undefined): value is string => {
-  if (!value) return false;
-  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
-};
+type Ctx = { params: Promise<{ slug: string }> };
 
-const cleanText = (value: string): string =>
-  value
-    .replace(/[\[\]"']+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+async function loadOwnedEvent(slug: string) {
+  const user = await getCurrentUser();
+  if (!user)
+    return {
+      error: NextResponse.json(
+        { message: "Not authenticated." },
+        { status: 401 },
+      ),
+    };
 
-const normalizeStringArray = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => normalizeStringArray(item));
-  }
-  if (typeof value !== "string") return [];
-
-  const trimmed = value.trim();
-  if (!trimmed) return [];
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) {
-      return parsed.flatMap((item) => normalizeStringArray(item));
-    }
-    if (typeof parsed === "string" && parsed.trim()) {
-      return normalizeStringArray(parsed);
-    }
-  } catch {
-    // fall through to legacy string cleanup below
-  }
-
-  const quotedFragments = [...trimmed.matchAll(/"([^\"]*)"?/g)]
-    .map((match) => cleanText(match[1]))
-    .filter(Boolean);
-
-  if (quotedFragments.length > 0) return quotedFragments;
-
-  if (trimmed.includes(",")) {
-    return trimmed
-      .split(",")
-      .map((item) => cleanText(item))
-      .filter(Boolean);
-  }
-
-  return [cleanText(trimmed)].filter(Boolean);
-};
-
-// Serialize all ObjectId/Date fields to plain strings
-const serializeEvent = (
-  event: IEvent & { _id: unknown; createdAt?: unknown; updatedAt?: unknown },
-) => ({
-  ...event,
-  _id: String(event._id),
-  createdAt: event.createdAt ? String(event.createdAt) : undefined,
-  updatedAt: event.updatedAt ? String(event.updatedAt) : undefined,
-  agenda: normalizeStringArray(event.agenda),
-  tags: normalizeStringArray(event.tags),
-});
-
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ slug?: string }> },
-) {
-  try {
-    await connectToDatabase();
-
-    const resolvedParams = await params;
-    const slug = resolvedParams.slug;
-
-    if (!isValidSlug(slug)) {
-      return NextResponse.json(
-        { message: "Invalid or missing slug.", status: 400 },
-        { status: 400 },
-      );
-    }
-
-    const event = await Event.findOne({ slug }).lean<IEvent>();
-
-    if (!event) {
-      return NextResponse.json(
-        { message: "Event not found.", status: 404 },
+  await connectToDatabase();
+  const event = await Event.findOne({ slug });
+  if (!event)
+    return {
+      error: NextResponse.json(
+        { message: "Event not found." },
         { status: 404 },
+      ),
+    };
+
+  if (!event.createdBy || String(event.createdBy) !== user.userId) {
+    return {
+      error: NextResponse.json(
+        { message: "You can only change your own events." },
+        { status: 403 },
+      ),
+    };
+  }
+  return { event };
+}
+
+export async function GET(_req: NextRequest, { params }: Ctx) {
+  const { slug } = await params;
+  await connectToDatabase();
+  const event = await Event.findOne({ slug }).lean();
+  if (!event)
+    return NextResponse.json({ message: "Event not found." }, { status: 404 });
+  return NextResponse.json({ event: serializeEvent(event) });
+}
+
+export async function PUT(req: NextRequest, { params }: Ctx) {
+  const { slug } = await params;
+  const result = await loadOwnedEvent(slug);
+  if ("error" in result) return result.error;
+
+  const body = await req.json().catch(() => null);
+  const parsed = eventSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { message: "Validation failed", details: formatZodError(parsed.error) },
+      { status: 400 },
+    );
+  }
+
+  try {
+    result.event.set(parsed.data); // only validated fields: no mass assignment of createdBy or slug
+    await result.event.save(); // runs the model hooks (slug, date and time normalization)
+    return NextResponse.json({
+      message: "Event updated.",
+      slug: result.event.slug,
+    });
+  } catch (e: unknown) {
+    if ((e as { code?: number })?.code === 11000) {
+      return NextResponse.json(
+        { message: "An event with this title already exists." },
+        { status: 409 },
       );
     }
-
+    console.error("PUT /api/events/[slug] failed", e);
     return NextResponse.json(
-      {
-        message: "Event fetched successfully.",
-        event: serializeEvent(
-          event as IEvent & {
-            _id: unknown;
-            createdAt?: unknown;
-            updatedAt?: unknown;
-          },
-        ),
-        status: 200,
-      },
-      { status: 200 },
-    );
-  } catch (error) {
-    console.error("GET /api/events/[slug] failed", error);
-    return NextResponse.json(
-      {
-        message: "Failed to fetch event.",
-        error: error instanceof Error ? error.message : "Unknown error",
-        status: 500,
-      },
+      { message: "Failed to update event." },
       { status: 500 },
     );
   }
+}
+
+export async function DELETE(_req: NextRequest, { params }: Ctx) {
+  const { slug } = await params;
+  const result = await loadOwnedEvent(slug);
+  if ("error" in result) return result.error;
+
+  await Booking.deleteMany({ eventId: result.event._id });
+  await result.event.deleteOne();
+  return NextResponse.json({ message: "Event deleted." });
 }

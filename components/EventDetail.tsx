@@ -13,14 +13,7 @@ const EventDetail = ({ slug }: EventDetailProps) => {
   const [isFavorited, setIsFavorited] = useState(false)
   const [favorites, setFavorites] = useState<string[]>([])
 
-  useEffect(() => {
-    const saved = localStorage.getItem('favorites')
-    if (saved) {
-      const fav = JSON.parse(saved)
-      setFavorites(fav)
-      setIsFavorited(fav.includes(slug))
-    }
-  }, [slug])
+  
 
   const handleFavorite = () => {
     const newFavorites = isFavorited
