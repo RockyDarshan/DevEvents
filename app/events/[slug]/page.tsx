@@ -9,7 +9,8 @@ import { cache, Suspense } from "react";
 import { Booking } from "@/database/booking.model";
 import { getCurrentUser } from "@/lib/auth";
 import OwnerActions from "@/components/OwnerActions";
-import { serializeEvent } from "@/lib/serialize"; // 1. Added serialization utility import
+import { serializeEvent } from "@/lib/serialize"; 
+import type { Metadata } from "next";
 
 const getEvent = cache(async (slug: string): Promise<IEvent | null> => {
   try {
@@ -70,6 +71,17 @@ const SimilarEvents = async ({ slug }: { slug: string }) => {
     </div>
   );
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const event = await getEvent(slug);
+  if (!event) return { title: "Event not found | CodeRift" };
+  return {
+    title: `${event.title} | CodeRift`,
+    description: event.overview,
+    openGraph: { title: event.title, description: event.overview, images: [event.image] },
+  };
+}
 
 const EventContent = async ({ slug }: { slug: string }) => {
   const event = await getEvent(slug);
